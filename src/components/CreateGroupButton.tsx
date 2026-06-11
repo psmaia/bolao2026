@@ -18,11 +18,13 @@ export default function CreateGroupButton({ userId }: { userId: string }) {
     if (!name.trim()) return
 
     setLoading(true)
-    const { data: group, error } = await supabase
-      .from('groups')
-      .insert({ name: name.trim(), description: description.trim() || null, owner_id: userId })
-      .select()
-      .single()
+	const invite_code = Math.random().toString(36).substring(2, 8).toUpperCase()
+
+	const { data: group, error } = await supabase
+  		.from('groups')
+  		.insert({ name: name.trim(), description: description.trim() || null, owner_id: user.id, invite_code })
+	.select()
+    	.single()
 
     if (error || !group) {
       toast.error('Erro ao criar grupo')
