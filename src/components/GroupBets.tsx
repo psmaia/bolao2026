@@ -38,6 +38,11 @@ export default function GroupBets({ matches, betsMap: initialBets, groupId, user
   }, [pending])
 
   const saveBet = async (matchId: string, home: number, away: number) => {
+    const match = matches.find(m => m.id === matchId)
+    if (match && new Date(match.match_date) <= new Date()) {
+      toast.error('Jogo já iniciado. Não é possível alterar o palpite.')
+      return
+    }
     setSaving(matchId)
     const existing = bets[matchId]
     if (existing) {
@@ -81,6 +86,7 @@ export default function GroupBets({ matches, betsMap: initialBets, groupId, user
               saving={saving === match.id}
               onSave={(h, a) => saveBet(match.id, h, a)}
               timezone={timezone}
+              locked={new Date(match.match_date) <= new Date()}
               ownerInfo={isOwner && memberCount ? { betCount: betCountByMatch?.[match.id] || 0, memberCount } : undefined}
             />
           ))}
@@ -98,17 +104,18 @@ export default function GroupBets({ matches, betsMap: initialBets, groupId, user
   )
 }
 
-function BetRow({ match, bet, saving, onSave, timezone, ownerInfo }: { match: Match; bet?: Bet; saving: boolean; onSave: (h: number, a: number) => void; timezone: string; ownerInfo?: { betCount: number; memberCount: number } }) {
+function BetRow({ match, bet, saving, onSave, timezone, locked, ownerInfo }: { match: Match; bet?: Bet; saving: boolean; onSave: (h: number, a: number) => void; timezone: string; locked?: boolean; ownerInfo?: { betCount: number; memberCount: number } }) {
   const { locale, t } = useLocale()
   const { date, time } = formatMatchDate(match.match_date, timezone, locale)
   const [home, setHome] = useState<number | ''>(bet?.home_score_bet ?? '')
   const [away, setAway] = useState<number | ''>(bet?.away_score_bet ?? '')
   return (
-    <div className={`card flex flex-col sm:flex-row items-center gap-4 ${!bet ? 'ring-1 ring-amber-200' : ''}`}>
+    <div className={`card flex flex-col sm:flex-row items-center gap-4 ${!bet && !locked ? 'ring-1 ring-amber-200' : ''} ${locked ? 'opacity-70' : ''}`}>
       <div className="text-center w-20 flex-shrink-0">
         <p className="text-sm font-bold text-brand-blue">{time}</p>
         <p className="text-xs text-gray-400">{date}</p>
-        {!bet && <p className="text-[10px] font-semibold text-amber-600 mt-1">{t('bets.noBet')}</p>}
+        {locked && <p className="text-[10px] font-semibold text-red-500 mt-1">🔒 Encerrado</p>}
+        {!locked && !bet && <p className="text-[10px] font-semibold text-amber-600 mt-1">{t('bets.noBet')}</p>}
         {ownerInfo && (
           <p className={`text-[10px] font-semibold mt-1 ${ownerInfo.betCount < ownerInfo.memberCount ? 'text-amber-600' : 'text-brand-green'}`}>
             {t('bets.betCount', { betCount: ownerInfo.betCount, memberCount: ownerInfo.memberCount })}
@@ -118,15 +125,18 @@ function BetRow({ match, bet, saving, onSave, timezone, ownerInfo }: { match: Ma
       <div className="flex-1 flex items-center justify-center gap-3">
         <div className="text-center w-24"><TeamFlag emoji={match.home_flag} size="md" /><p className="text-xs font-medium mt-1 truncate">{match.home_team}</p>{countryCode(match.home_team) && <p className="text-[10px] font-semibold text-gray-400 tracking-wider">{countryCode(match.home_team)}</p>}</div>
         <div className="flex items-center gap-1">
-          <input type="number" min="0" max="20" value={home} onChange={e => setHome(e.target.value === '' ? '' : Number(e.target.value))} className="w-12 text-center text-lg font-bold border-2 border-gray-200 rounded-lg p-1 focus:border-brand-green focus:outline-none" />
+          <input type="number" min="0" max="20" value={home} onChange={e => !locked && setHome(e.target.value === '' ? '' : Number(e.target.value))} disabled={locked} className={`w-12 text-center text-lg font-bold border-2 rounded-lg p-1 ${locked ? 'border-gray-100 bg-gray-50 text-gray-400 cursor-not-allowed' : 'border-gray-200 focus:border-brand-green focus:outline-none'}`} />
           <span className="text-gray-300 font-bold">×</span>
-          <input type="number" min="0" max="20" value={away} onChange={e => setAway(e.target.value === '' ? '' : Number(e.target.value))} className="w-12 text-center text-lg font-bold border-2 border-gray-200 rounded-lg p-1 focus:border-brand-green focus:outline-none" />
+          <input type="number" min="0" max="20" value={away} onChange={e => !locked && setAway(e.target.value === '' ? '' : Number(e.target.value))} disabled={locked} className={`w-12 text-center text-lg font-bold border-2 rounded-lg p-1 ${locked ? 'border-gray-100 bg-gray-50 text-gray-400 cursor-not-allowed' : 'border-gray-200 focus:border-brand-green focus:outline-none'}`} />
         </div>
         <div className="text-center w-24"><TeamFlag emoji={match.away_flag} size="md" /><p className="text-xs font-medium mt-1 truncate">{match.away_team}</p>{countryCode(match.away_team) && <p className="text-[10px] font-semibold text-gray-400 tracking-wider">{countryCode(match.away_team)}</p>}</div>
       </div>
-      <button onClick={() => onSave(Number(home), Number(away))} disabled={saving || home === '' || away === ''} className="btn-primary text-sm px-3 py-1.5 flex-shrink-0">
-        {saving ? '...' : bet ? t('bets.update') : t('bets.bet')}
-      </button>
+      {locked
+        ? <span className="text-xs text-gray-400 flex-shrink-0">{bet ? `${bet.home_score_bet} × ${bet.away_score_bet}` : '—'}</span>
+        : <button onClick={() => onSave(Number(home), Number(away))} disabled={saving || home === '' || away === ''} className="btn-primary text-sm px-3 py-1.5 flex-shrink-0">
+            {saving ? '...' : bet ? t('bets.update') : t('bets.bet')}
+          </button>
+      }
     </div>
   )
 }
