@@ -1,5 +1,5 @@
 'use client'
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 import toast from 'react-hot-toast'
 import type { Database } from '@/lib/database.types'
@@ -23,6 +23,7 @@ interface Props {
 export default function GroupBets({ matches, betsMap: initialBets, groupId, userId, isOwner, memberCount, betCountByMatch }: Props) {
   const [bets, setBets] = useState<Record<string, Bet>>(initialBets)
   const [saving, setSaving] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<'palpites' | 'resultados'>('palpites')
   const supabase = createClient() as any
   const timezone = getUserTimezone()
   const { locale, t } = useLocale()
@@ -60,44 +61,65 @@ export default function GroupBets({ matches, betsMap: initialBets, groupId, user
 
   return (
     <div>
-      {upcoming.length === 0 && <p className="text-gray-400 text-sm text-center py-8">{t('bets.noneAvailable')}</p>}
-      {upcoming.length > 0 && (
-        <div className="flex flex-col gap-3 mb-8">
-          <p className="text-xs text-gray-400">{t('bets.closeInfo', { tz: timezone })}</p>
-          {pending.length > 0 && (
-            <div className={`rounded-lg px-4 py-3 text-sm flex items-center gap-2 ${pendingSoon.length > 0 ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'bg-gray-50 text-gray-600 border border-gray-200'}`}>
-              <span>{pendingSoon.length > 0 ? '⏰' : '📝'}</span>
-              <span>
-                {pendingSoon.length > 0
-                  ? <>{t('bets.urgentWarning', {
-                      count: pendingSoon.length,
-                      game: t(pendingSoon.length === 1 ? 'bets.game' : 'bets.games'),
-                      extra: pending.length > pendingSoon.length ? t('bets.andMore', { count: pending.length - pendingSoon.length }) : '',
-                    })}</>
-                  : <>{t('bets.normalWarning', { count: pending.length, games: t(pending.length === 1 ? 'bets.gameSimple' : 'bets.gamesSimple') })}</>}
-              </span>
-            </div>
-          )}
-          {upcoming.map(match => (
-            <BetRow
-              key={match.id}
-              match={match}
-              bet={bets[match.id]}
-              saving={saving === match.id}
-              onSave={(h, a) => saveBet(match.id, h, a)}
-              timezone={timezone}
-              locked={new Date(match.match_date) <= new Date()}
-              ownerInfo={isOwner && memberCount ? { betCount: betCountByMatch?.[match.id] || 0, memberCount } : undefined}
-            />
-          ))}
+      {/* Abas */}
+      <div className="flex gap-1 mb-4 border-b border-gray-200">
+        <button
+          onClick={() => setActiveTab('palpites')}
+          className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${activeTab === 'palpites' ? 'bg-white border border-b-white border-gray-200 text-brand-blue -mb-px' : 'text-gray-500 hover:text-gray-700'}`}
+        >
+          📝 Palpites
+          {pending.length > 0 && <span className="ml-1.5 bg-amber-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{pending.length}</span>}
+        </button>
+        <button
+          onClick={() => setActiveTab('resultados')}
+          className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${activeTab === 'resultados' ? 'bg-white border border-b-white border-gray-200 text-brand-blue -mb-px' : 'text-gray-500 hover:text-gray-700'}`}
+        >
+          🏆 Resultados
+          {past.length > 0 && <span className="ml-1.5 bg-gray-200 text-gray-600 text-[10px] font-bold px-1.5 py-0.5 rounded-full">{past.length}</span>}
+        </button>
+      </div>
+
+      {/* Aba Palpites */}
+      {activeTab === 'palpites' && (
+        <div className="flex flex-col gap-3">
+          {upcoming.length === 0
+            ? <p className="text-gray-400 text-sm text-center py-8">{t('bets.noneAvailable')}</p>
+            : <>
+                <p className="text-xs text-gray-400">{t('bets.closeInfo', { tz: timezone })}</p>
+                {pending.length > 0 && (
+                  <div className={`rounded-lg px-4 py-3 text-sm flex items-center gap-2 ${pendingSoon.length > 0 ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'bg-gray-50 text-gray-600 border border-gray-200'}`}>
+                    <span>{pendingSoon.length > 0 ? '⏰' : '📝'}</span>
+                    <span>
+                      {pendingSoon.length > 0
+                        ? <>{t('bets.urgentWarning', { count: pendingSoon.length, game: t(pendingSoon.length === 1 ? 'bets.game' : 'bets.games'), extra: pending.length > pendingSoon.length ? t('bets.andMore', { count: pending.length - pendingSoon.length }) : '' })}</>
+                        : <>{t('bets.normalWarning', { count: pending.length, games: t(pending.length === 1 ? 'bets.gameSimple' : 'bets.gamesSimple') })}</>}
+                    </span>
+                  </div>
+                )}
+                {upcoming.map(match => (
+                  <BetRow
+                    key={match.id}
+                    match={match}
+                    bet={bets[match.id]}
+                    saving={saving === match.id}
+                    onSave={(h, a) => saveBet(match.id, h, a)}
+                    timezone={timezone}
+                    locked={new Date(match.match_date) <= new Date()}
+                    ownerInfo={isOwner && memberCount ? { betCount: betCountByMatch?.[match.id] || 0, memberCount } : undefined}
+                  />
+                ))}
+              </>
+          }
         </div>
       )}
-      {past.length > 0 && (
-        <div>
-          <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">{t('bets.finishedGames')}</h3>
-          <div className="flex flex-col gap-2">
-            {past.map(match => <PastBetRow key={match.id} match={match} bet={bets[match.id]} timezone={timezone} />)}
-          </div>
+
+      {/* Aba Resultados */}
+      {activeTab === 'resultados' && (
+        <div className="flex flex-col gap-2">
+          {past.length === 0
+            ? <p className="text-gray-400 text-sm text-center py-8">Nenhum jogo encerrado ainda.</p>
+            : past.map(match => <PastBetRow key={match.id} match={match} bet={bets[match.id]} timezone={timezone} />)
+          }
         </div>
       )}
     </div>
