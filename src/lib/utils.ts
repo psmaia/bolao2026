@@ -1,139 +1,125 @@
-// ============================================================
-// Utilitários gerais
-// ============================================================
-
-/**
- * Valida CPF pelo dígito verificador
- */
 export function validateCPF(cpf: string): boolean {
   const clean = cpf.replace(/\D/g, '')
   if (clean.length !== 11) return false
-  if (/^(\d)\1+$/.test(clean)) return false // todos os dígitos iguais
-
+  if (/^(\d)\1+$/.test(clean)) return false
   const calc = (str: string, len: number) => {
     let sum = 0
-    for (let i = 0; i < len; i++) {
-      sum += parseInt(str[i]) * (len + 1 - i)
-    }
+    for (let i = 0; i < len; i++) sum += parseInt(str[i]) * (len + 1 - i)
     const rem = (sum * 10) % 11
     return rem === 10 || rem === 11 ? 0 : rem
   }
-
-  const d1 = calc(clean, 9)
-  const d2 = calc(clean, 10)
-
-  return d1 === parseInt(clean[9]) && d2 === parseInt(clean[10])
+  return calc(clean, 9) === parseInt(clean[9]) && calc(clean, 10) === parseInt(clean[10])
 }
 
-/**
- * Formata CPF: 000.000.000-00
- */
 export function formatCPF(value: string): string {
-  return value
-    .replace(/\D/g, '')
-    .slice(0, 11)
+  return value.replace(/\D/g, '').slice(0, 11)
     .replace(/(\d{3})(\d)/, '$1.$2')
     .replace(/(\d{3})(\d)/, '$1.$2')
     .replace(/(\d{3})(\d{1,2})$/, '$1-$2')
 }
 
-/**
- * Formata celular: (00) 00000-0000
- */
 export function formatPhone(value: string): string {
-  return value
-    .replace(/\D/g, '')
-    .slice(0, 11)
+  const clean = value.replace(/\D/g, '').slice(0, 11)
+  if (clean.length <= 10) {
+    return clean
+      .replace(/(\d{2})(\d)/, '($1) $2')
+      .replace(/(\d{4})(\d{1,4})$/, '$1-$2')
+  }
+  return clean
     .replace(/(\d{2})(\d)/, '($1) $2')
-    .replace(/(\d{5})(\d)/, '$1-$2')
+    .replace(/(\d{5})(\d{1,4})$/, '$1-$2')
 }
 
-/**
- * Retorna o nome do fuso horário do browser
- */
 export function getUserTimezone(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone
 }
 
-/**
- * Formata data/hora de um jogo no fuso do usuário
- */
-export function formatMatchDate(utcDate: string, timezone?: string): {
-  date: string
-  time: string
-  dayOfWeek: string
-  relative: string
-} {
+export function formatMatchDate(utcDate: string, timezone?: string, locale: 'pt' | 'es' = 'pt') {
   const tz = timezone || getUserTimezone()
+  const intlLocale = locale === 'es' ? 'es-ES' : 'pt-BR'
   const dt = new Date(utcDate)
-
-  const dateStr = dt.toLocaleDateString('pt-BR', {
-    timeZone: tz,
-    day: '2-digit',
-    month: '2-digit',
-  })
-
-  const timeStr = dt.toLocaleTimeString('pt-BR', {
-    timeZone: tz,
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-
-  const dayOfWeek = dt.toLocaleDateString('pt-BR', {
-    timeZone: tz,
-    weekday: 'short',
-  })
-
-  // Relativo: "hoje", "amanhã", "em X dias"
+  const date = dt.toLocaleDateString(intlLocale, { timeZone: tz, day: '2-digit', month: '2-digit' })
+  const time = dt.toLocaleTimeString(intlLocale, { timeZone: tz, hour: '2-digit', minute: '2-digit' })
+  const dayOfWeek = dt.toLocaleDateString(intlLocale, { timeZone: tz, weekday: 'short' })
   const now = new Date()
   const diffMs = dt.getTime() - now.getTime()
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
   let relative = ''
-  if (diffMs < 0) {
-    relative = 'encerrado'
-  } else if (diffDays === 0) {
-    relative = 'hoje'
-  } else if (diffDays === 1) {
-    relative = 'amanhã'
-  } else if (diffDays <= 7) {
-    relative = `em ${diffDays} dias`
+  if (locale === 'es') {
+    if (diffMs < 0) relative = 'finalizado'
+    else if (diffDays === 0) relative = 'hoy'
+    else if (diffDays === 1) relative = 'mañana'
+    else if (diffDays <= 7) relative = `en ${diffDays} días`
+  } else {
+    if (diffMs < 0) relative = 'encerrado'
+    else if (diffDays === 0) relative = 'hoje'
+    else if (diffDays === 1) relative = 'amanhã'
+    else if (diffDays <= 7) relative = `em ${diffDays} dias`
   }
-
-  return { date: dateStr, time: timeStr, dayOfWeek, relative }
+  return { date, time, dayOfWeek, relative }
 }
 
-/**
- * Retorna label legível do estágio
- */
-export function stageLabel(stage: string): string {
-  const labels: Record<string, string> = {
-    group: 'Fase de Grupos',
-    r32:   'Oitavas de Final',
-    r16:   'Quartas de Final',
-    qf:    'Semifinais',
-    sf:    'Semifinais',
-    '3rd': 'Terceiro Lugar',
-    final: 'Final',
+export function formatLongDate(value: string, locale: 'pt' | 'es' = 'pt', timezone?: string) {
+  const intlLocale = locale === 'es' ? 'es-ES' : 'pt-BR'
+  try {
+    return new Date(value).toLocaleDateString(intlLocale, { timeZone: timezone, weekday: 'long', day: '2-digit', month: 'long' })
+  } catch {
+    return ''
   }
-  return labels[stage] || stage
 }
 
-/**
- * Retorna classe de cor por status do jogo
- */
-export function statusColor(status: string): string {
-  const colors: Record<string, string> = {
-    scheduled: 'text-gray-500',
-    live:      'text-red-600 animate-pulse',
-    finished:  'text-green-700',
-    cancelled: 'text-gray-400 line-through',
+export function formatShortDate(value: string, locale: 'pt' | 'es' = 'pt') {
+  const intlLocale = locale === 'es' ? 'es-ES' : 'pt-BR'
+  try {
+    return new Date(value).toLocaleDateString(intlLocale, { day: '2-digit', month: '2-digit', year: 'numeric' })
+  } catch {
+    return ''
   }
-  return colors[status] || 'text-gray-500'
 }
 
-/**
- * Trunca string
- */
-export function truncate(str: string, max: number): string {
-  return str.length > max ? str.slice(0, max) + '…' : str
+// Mapeia o nome da seleção (como cadastrado pelo admin) para o código de 3 letras (padrão FIFA).
+// Times ainda não definidos (ex: "Seleção A2", "A definir") retornam null e não exibem código.
+const COUNTRY_CODES: Record<string, string> = {
+  'alemanha': 'GER', 'argentina': 'ARG', 'austrália': 'AUS', 'áustria': 'AUT',
+  'bélgica': 'BEL', 'bolívia': 'BOL', 'brasil': 'BRA', 'camarões': 'CMR',
+  'canadá': 'CAN', 'catar': 'QAT', 'chile': 'CHI', 'colômbia': 'COL',
+  'costa do marfim': 'CIV', 'costa rica': 'CRC', 'croácia': 'CRO', 'dinamarca': 'DEN',
+  'egito': 'EGY', 'equador': 'ECU', 'escócia': 'SCO', 'eslováquia': 'SVK',
+  'espanha': 'ESP', 'estados unidos': 'USA', 'frança': 'FRA', 'gana': 'GHA',
+  'grécia': 'GRE', 'holanda': 'NED', 'países baixos': 'NED', 'hungria': 'HUN',
+  'inglaterra': 'ENG', 'irã': 'IRN', 'irlanda': 'IRL', 'islândia': 'ISL',
+  'itália': 'ITA', 'jamaica': 'JAM', 'japão': 'JPN', 'malásia': 'MAS',
+  'marrocos': 'MAR', 'méxico': 'MEX', 'nigéria': 'NGA', 'noruega': 'NOR',
+  'nova zelândia': 'NZL', 'panamá': 'PAN', 'paraguai': 'PAR', 'peru': 'PER',
+  'polônia': 'POL', 'portugal': 'POR', 'romênia': 'ROU',
+  'arábia saudita': 'KSA', 'senegal': 'SEN', 'sérvia': 'SRB', 'suécia': 'SWE',
+  'tunísia': 'TUN', 'turquia': 'TUR', 'ucrânia': 'UKR',
+  'uruguai': 'URU', 'gales': 'WAL', 'país de gales': 'WAL', 'venezuela': 'VEN',
+  'coreia do sul': 'KOR', 'austrália e nova zelândia': 'ANZ', 'cabo verde': 'CPV',
+  'curaçao': 'CUW', 'haiti': 'HAI', 'jordânia': 'JOR', 'nova caledônia': 'NCL',
+  'uzbequistão': 'UZB', 'argélia': 'ALG', 'rep. dem. do congo': 'COD',
+  'áfrica do sul': 'RSA', 'república tcheca': 'CZE', 'república checa': 'CZE',
+  'rep. tcheca': 'CZE', 'rep. checa': 'CZE', 'rep tcheca': 'CZE', 'rep checa': 'CZE',
+  'tchéquia': 'CZE', 'chéquia': 'CZE', 'tchecoslováquia': 'CZE',
+  'bósnia': 'BIH', 'bósnia e herzegovina': 'BIH', 'bósnia-herzegovina': 'BIH',
+  'suíça': 'SUI', 'suiça': 'SUI', 'suiza': 'SUI',
+  'congo': 'CGO', 'república do congo': 'CGO', 'rep. do congo': 'CGO',
+  'rd congo': 'COD', 'r.d. congo': 'COD', 'rep. dem. congo': 'COD',
+  'república democrática do congo': 'COD', 'iraque': 'IRQ',
+}
+
+// Remove acentos para casar nomes mesmo com pequenas diferenças de grafia
+// (ex: "Suiça" vs "Suíça", "Africa do Sul" vs "África do Sul").
+function stripAccents(s: string): string {
+  return s.normalize('NFD').replace(/[̀-ͯ]/g, '')
+}
+
+const COUNTRY_CODES_NORMALIZED: Record<string, string> = Object.fromEntries(
+  Object.entries(COUNTRY_CODES).map(([name, code]) => [stripAccents(name), code])
+)
+
+export function countryCode(teamName: string | null | undefined): string | null {
+  if (!teamName) return null
+  const key = stripAccents(teamName.trim().toLowerCase())
+  return COUNTRY_CODES_NORMALIZED[key] || null
 }
