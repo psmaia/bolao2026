@@ -135,10 +135,20 @@ export async function GET(req: NextRequest) {
     )
     if (!match) continue
 
+    // Pênaltis (só existem em mata-mata)
+    const penaltyHome = score?.penalty?.home ?? null
+    const penaltyAway = score?.penalty?.away ?? null
+
     // Atualiza o placar
     const { error: updateError } = await supabase
       .from('matches')
-      .update({ home_score: homeGoals, away_score: awayGoals, updated_at: new Date().toISOString() })
+      .update({
+        home_score: homeGoals,
+        away_score: awayGoals,
+        penalty_home: penaltyHome,
+        penalty_away: penaltyAway,
+        updated_at: new Date().toISOString()
+      })
       .eq('id', match.id)
 
     if (updateError) {

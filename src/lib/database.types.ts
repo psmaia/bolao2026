@@ -228,6 +228,8 @@ export type Database = {
           id: string
           match_date: string
           match_number: number
+          penalty_home: number | null
+          penalty_away: number | null
           stage: string
           status: string | null
           updated_at: string | null
@@ -247,6 +249,8 @@ export type Database = {
           id?: string
           match_date: string
           match_number: number
+          penalty_home?: number | null
+          penalty_away?: number | null
           stage: string
           status?: string | null
           updated_at?: string | null
@@ -266,6 +270,8 @@ export type Database = {
           id?: string
           match_date?: string
           match_number?: number
+          penalty_home?: number | null
+          penalty_away?: number | null
           stage?: string
           status?: string | null
           updated_at?: string | null

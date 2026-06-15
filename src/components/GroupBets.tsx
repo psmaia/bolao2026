@@ -174,7 +174,15 @@ function PastBetRow({ match, bet, timezone }: { match: Match; bet?: Bet; timezon
       <div className="text-xs text-gray-400 w-16 flex-shrink-0">{date}</div>
       <div className="flex-1 flex items-center justify-center gap-2 text-sm">
         <TeamFlag emoji={match.home_flag} size="sm" /><span className="font-medium text-xs">{match.home_team}</span>{countryCode(match.home_team) && <span className="text-[10px] font-semibold text-gray-400">({countryCode(match.home_team)})</span>}
-        {isFinished ? <span className="font-bold mx-1">{match.home_score} × {match.away_score}</span> : <span className="text-gray-300 mx-1">×</span>}
+        {isFinished
+          ? <span className="font-bold mx-1">
+              {match.home_score} × {match.away_score}
+              {match.penalty_home !== null && match.penalty_away !== null && (
+                <span className="text-xs font-normal text-gray-400 ml-1">(p {match.penalty_home}×{match.penalty_away})</span>
+              )}
+            </span>
+          : <span className="text-gray-300 mx-1">×</span>
+        }
         {countryCode(match.away_team) && <span className="text-[10px] font-semibold text-gray-400">({countryCode(match.away_team)})</span>}<span className="font-medium text-xs">{match.away_team}</span><TeamFlag emoji={match.away_flag} size="sm" />
       </div>
       {bet ? (
