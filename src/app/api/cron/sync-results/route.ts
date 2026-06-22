@@ -87,12 +87,17 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ message: 'Nenhum jogo pendente', updated: 0 })
   }
 
-  // Busca fixtures de hoje na API-Football
+  // Busca fixtures nas datas dos jogos pendentes (não só hoje/ontem — um jogo
+  // de 3 dias atrás que falhou ao sincronizar precisa continuar sendo tentado,
+  // senão fica "scheduled" para sempre e só é corrigido manualmente no admin).
+  const pendingDates = Array.from(
+    new Set(pendingMatches.map(m => new Date(m.match_date).toISOString().split('T')[0]))
+  )
   const today = new Date().toISOString().split('T')[0]
-  const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0]
+  if (!pendingDates.includes(today)) pendingDates.push(today)
 
   let fixtures: any[] = []
-  for (const date of [today, yesterday]) {
+  for (const date of pendingDates) {
     const res = await fetch(
       `https://v3.football.api-sports.io/fixtures?date=${date}&league=1&season=2026`,
       { headers: { 'x-apisports-key': process.env.APISPORTS_KEY! } }
@@ -103,7 +108,7 @@ export async function GET(req: NextRequest) {
 
   // Se league=1 não retornou nada, tenta sem filtro de liga (buscando por data)
   if (fixtures.length === 0) {
-    for (const date of [today, yesterday]) {
+    for (const date of pendingDates) {
       const res = await fetch(
         `https://v3.football.api-sports.io/fixtures?date=${date}`,
         { headers: { 'x-apisports-key': process.env.APISPORTS_KEY! } }
