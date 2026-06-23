@@ -96,6 +96,10 @@ export async function GET(req: NextRequest) {
   const today = new Date().toISOString().split('T')[0]
   if (!pendingDates.includes(today)) pendingDates.push(today)
 
+  // Diagnóstico temporário: captura erros/avisos da API e devolve no JSON de
+  // resposta, já que não temos acesso fácil aos logs do Vercel para depurar.
+  const apiErrors: any[] = []
+
   let fixtures: any[] = []
   for (const date of pendingDates) {
     const res = await fetch(
@@ -103,6 +107,9 @@ export async function GET(req: NextRequest) {
       { headers: { 'x-apisports-key': process.env.APISPORTS_KEY! } }
     )
     const data = await res.json()
+    if (data.errors && Object.keys(data.errors).length > 0) {
+      apiErrors.push({ date, league: 1, errors: data.errors, results: data.results })
+    }
     if (data.response) fixtures = fixtures.concat(data.response)
   }
 
@@ -114,12 +121,17 @@ export async function GET(req: NextRequest) {
         { headers: { 'x-apisports-key': process.env.APISPORTS_KEY! } }
       )
       const data = await res.json()
+      if (data.errors && Object.keys(data.errors).length > 0) {
+        apiErrors.push({ date, league: 'none', errors: data.errors, results: data.results })
+      }
       if (data.response) fixtures = fixtures.concat(data.response)
     }
   }
 
   let updated = 0
   const errors: string[] = []
+  const ftFixturesSeen: string[] = [] // diagnóstico: nomes (já mapeados p/ PT) de jogos FT vistos na API
+  const unmatchedFt: string[] = [] // diagnóstico: jogos FT que não bateram com nenhum pendingMatch
 
   for (const fixture of fixtures) {
     const { fixture: f, teams, goals, score } = fixture
@@ -132,13 +144,18 @@ export async function GET(req: NextRequest) {
     const homeGoals = goals.home
     const awayGoals = goals.away
 
+    ftFixturesSeen.push(`${homeEn} (${homePt}) x ${awayEn} (${awayPt}) [${homeGoals}-${awayGoals}]`)
+
     if (homeGoals === null || awayGoals === null) continue
 
     // Encontra o jogo correspondente no nosso banco
     const match = pendingMatches.find(m =>
       m.home_team === homePt && m.away_team === awayPt
     )
-    if (!match) continue
+    if (!match) {
+      unmatchedFt.push(`${homePt} x ${awayPt}`)
+      continue
+    }
 
     // Pênaltis (só existem em mata-mata)
     const penaltyHome = score?.penalty?.home ?? null
@@ -172,5 +189,18 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ message: 'Sync concluído', updated, errors })
+  return NextResponse.json({
+    message: 'Sync concluído',
+    updated,
+    errors,
+    debug: {
+      pendingDates,
+      pendingMatchesCount: pendingMatches.length,
+      pendingMatchesSample: pendingMatches.slice(0, 5).map(m => `${m.home_team} x ${m.away_team} (${m.match_date})`),
+      totalFixturesFetched: fixtures.length,
+      apiErrors,
+      ftFixturesSeen,
+      unmatchedFt,
+    },
+  })
 }
